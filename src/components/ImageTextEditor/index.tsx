@@ -21,9 +21,9 @@ export const ImageTextEditor: React.FC = () => {
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndexRef, setHistoryIndex] = useRefState(0);
 
-  const reRender = () => {
+  const reRender = useCallback(() => {
     setHistory((prevData) => [...prevData]);
-  };
+  }, []);
 
   // Initialize canvas
   useEffect(() => {
@@ -84,41 +84,75 @@ export const ImageTextEditor: React.FC = () => {
     };
   }, []);
 
-  const bringLayerToBottom = useCallback((index: number) => {
+  const saveToHistory = useCallback(() => {
     if (!fabricCanvasRef.current) return;
 
-    const obj = fabricCanvasRef.current.getObjects()[index];
+    setHistory((history) => {
+      const state = JSON.stringify(fabricCanvasRef.current!.toJSON());
+      const newHistory = history.slice(0, historyIndexRef.current + 1);
+      newHistory.push(state);
 
-    fabricCanvasRef.current!.bringObjectToFront(obj);
-    // fabricCanvasRef.current.renderAll();
-    saveToHistory();
-  }, []);
+      // Keep only last 20 states
+      if (newHistory.length > 20) {
+        newHistory.shift();
+      }
 
-  const sendLayerToTop = useCallback((index: number) => {
-    if (!fabricCanvasRef.current) return;
+      historyIndexRef.current = newHistory.length - 1;
 
-    const obj = fabricCanvasRef.current.getObjects()[index];
+      // Save to localStorage
+      localStorage.setItem("imageTextEditor", state);
 
-    fabricCanvasRef.current!.sendObjectToBack(obj);
-    saveToHistory();
-  }, []);
+      return newHistory;
+    });
+  }, [history]);
 
-  const moveLayerUp = useCallback((index: number) => {
-    if (!fabricCanvasRef.current) return;
+  const bringLayerToBottom = useCallback(
+    (index: number) => {
+      if (!fabricCanvasRef.current) return;
 
-    const obj = fabricCanvasRef.current.getObjects()[index];
+      const obj = fabricCanvasRef.current.getObjects()[index];
 
-    fabricCanvasRef.current!.bringObjectForward(obj);
-    saveToHistory();
-  }, []);
+      fabricCanvasRef.current!.bringObjectToFront(obj);
 
-  const moveLayerDown = useCallback((index: number) => {
-    if (!fabricCanvasRef.current) return;
-    const obj = fabricCanvasRef.current.getObjects()[index];
+      saveToHistory();
+    },
+    [saveToHistory]
+  );
 
-    fabricCanvasRef.current!.sendObjectBackwards(obj);
-    saveToHistory();
-  }, []);
+  const sendLayerToTop = useCallback(
+    (index: number) => {
+      if (!fabricCanvasRef.current) return;
+
+      const obj = fabricCanvasRef.current.getObjects()[index];
+
+      fabricCanvasRef.current!.sendObjectToBack(obj);
+      saveToHistory();
+    },
+    [saveToHistory]
+  );
+
+  const moveLayerUp = useCallback(
+    (index: number) => {
+      if (!fabricCanvasRef.current) return;
+
+      const obj = fabricCanvasRef.current.getObjects()[index];
+
+      fabricCanvasRef.current!.bringObjectForward(obj);
+      saveToHistory();
+    },
+    [saveToHistory]
+  );
+
+  const moveLayerDown = useCallback(
+    (index: number) => {
+      if (!fabricCanvasRef.current) return;
+      const obj = fabricCanvasRef.current.getObjects()[index];
+
+      fabricCanvasRef.current!.sendObjectBackwards(obj);
+      saveToHistory();
+    },
+    [saveToHistory]
+  );
 
   const handleImageUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,30 +198,8 @@ export const ImageTextEditor: React.FC = () => {
       };
       reader.readAsDataURL(file);
     },
-    []
+    [saveToHistory]
   );
-
-  const saveToHistory = useCallback(() => {
-    if (!fabricCanvasRef.current) return;
-
-    setHistory((history) => {
-      const state = JSON.stringify(fabricCanvasRef.current!.toJSON());
-      const newHistory = history.slice(0, historyIndexRef.current + 1);
-      newHistory.push(state);
-
-      // Keep only last 20 states
-      if (newHistory.length > 20) {
-        newHistory.shift();
-      }
-
-      historyIndexRef.current = newHistory.length - 1;
-
-      // Save to localStorage
-      localStorage.setItem("imageTextEditor", state);
-
-      return newHistory;
-    });
-  }, [history]);
 
   const addTextLayer = useCallback(() => {
     if (!fabricCanvasRef.current) return;
@@ -290,12 +302,15 @@ export const ImageTextEditor: React.FC = () => {
   }, []);
 
   // Layer management functions
-  const handleLayerSelect = useCallback((layer: FabricObject) => {
-    if (!fabricCanvasRef.current) return;
-    fabricCanvasRef.current.setActiveObject(layer);
-    fabricCanvasRef.current.requestRenderAll();
-    reRender();
-  }, []);
+  const handleLayerSelect = useCallback(
+    (layer: FabricObject) => {
+      if (!fabricCanvasRef.current) return;
+      fabricCanvasRef.current.setActiveObject(layer);
+      fabricCanvasRef.current.requestRenderAll();
+      reRender();
+    },
+    [reRender]
+  );
 
   const handleLayerToggleVisibility = useCallback(
     (layerId: string) => {
@@ -311,7 +326,7 @@ export const ImageTextEditor: React.FC = () => {
         reRender();
       }
     },
-    [saveToHistory]
+    [saveToHistory, reRender]
   );
 
   const handleLayerToggleLock = useCallback(
@@ -329,7 +344,7 @@ export const ImageTextEditor: React.FC = () => {
         reRender();
       }
     },
-    [saveToHistory]
+    [saveToHistory, reRender]
   );
 
   const handleLayerDuplicate = useCallback(
@@ -378,7 +393,7 @@ export const ImageTextEditor: React.FC = () => {
         toast.success("Layer deleted!");
       }
     },
-    [saveToHistory]
+    [saveToHistory, reRender]
   );
 
   return (

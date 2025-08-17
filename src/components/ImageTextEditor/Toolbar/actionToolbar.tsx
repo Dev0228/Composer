@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, RotateCcw, Type } from "lucide-react";
+import { Download, RotateCcw } from "lucide-react";
 interface ActionToolbarProps {
   undo: () => void;
   redo: () => void;

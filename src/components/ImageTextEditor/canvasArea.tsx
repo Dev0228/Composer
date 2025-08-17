@@ -2,10 +2,10 @@ import { Card } from "@/components/ui/card";
 import { Upload } from "lucide-react";
 import { forwardRef } from "react";
 
-interface CanvasArea {
+interface CanvasAreaProps {
   backgroundImage: string | null;
 }
-export const CanvasArea = forwardRef<HTMLCanvasElement, CanvasArea>(
+export const CanvasArea = forwardRef<HTMLCanvasElement, CanvasAreaProps>(
   ({ backgroundImage }, canvasRef) => {
     return (
       <div className="flex-1 m-4 ml-2">
@@ -36,3 +36,5 @@ export const CanvasArea = forwardRef<HTMLCanvasElement, CanvasArea>(
     );
   }
 );
+
+CanvasArea.displayName = "CanvasArea";

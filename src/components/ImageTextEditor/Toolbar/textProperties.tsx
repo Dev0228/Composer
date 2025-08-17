@@ -2,7 +2,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FontPicker } from "@/components/ui/font-picker";
 import { useDebouncedCallback } from "use-debounce";
-import { useCallback } from "react";
 
 import { FONT_WEIGHTS } from "@/constants/constants";
 import {
