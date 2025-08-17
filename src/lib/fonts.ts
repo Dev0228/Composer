@@ -96,7 +96,7 @@ export const FONT_CATEGORIES = [
   "display",
   "handwriting",
   "monospace",
-] as const;
+];
 
 export type FontCategory = (typeof FONT_CATEGORIES)[number];
 
@@ -110,6 +110,6 @@ export const FONT_WEIGHTS = [
   "700",
   "800",
   "900",
-] as const;
+];
 
 export type FontWeight = (typeof FONT_WEIGHTS)[number];

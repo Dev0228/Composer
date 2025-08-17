@@ -5,27 +5,33 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ButtonToolbar } from "@/components/ImageTextEditor/Toolbar/buttonToolbar";
 
-import { FabricObject, IText } from "fabric";
+import { Canvas, FabricObject, IText, FabricImage } from "fabric";
 import { ActionToolbar } from "@/components/ImageTextEditor/Toolbar/actionToolbar";
 import { TextProperties } from "@/components/ImageTextEditor/Toolbar/textProperties";
-import { LayerToolBar } from "@/components/ImageTextEditor/Toolbar/layerToolbar";
 import { UpLoadImage } from "@/components/ImageTextEditor/Toolbar/upLoadImage";
+import { LayerList } from "@/components/ImageTextEditor/Toolbar/layerList";
 
 interface SideLayoutProps {
   historyIndex: number;
-  selectedLayer: FabricObject | undefined;
-  history: any[];
+  selectedLayers: FabricObject[] | undefined;
+  history: string[];
+  canvas: Canvas | null;
   handleImageUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   addTextLayer: () => void;
   undo: () => void;
   redo: () => void;
   exportImage: () => void;
   resetEditor: () => void;
-  updateTextProperty: (property: string, value: any) => void;
-  moveLayerUp: () => void;
-  moveLayerDown: () => void;
-  bringLayerToFront: () => void;
-  sendLayerToBack: () => void;
+  updateTextProperty: (property: string, value: unknown) => void;
+  moveLayerUp: (index: number) => void;
+  moveLayerDown: (index: number) => void;
+  bringLayerToBottom: (index: number) => void;
+  sendLayerToTop: (index: number) => void;
+  onLayerSelect: (layer: IText | FabricImage) => void;
+  onLayerToggleVisibility: (layerId: string) => void;
+  onLayerToggleLock: (layerId: string) => void;
+  onLayerDuplicate: (layerId: string) => void;
+  onLayerDelete: (layerId: string) => void;
 }
 
 export const Toolbar: React.FC<SideLayoutProps> = ({
@@ -38,40 +44,49 @@ export const Toolbar: React.FC<SideLayoutProps> = ({
   updateTextProperty,
   moveLayerUp,
   moveLayerDown,
-  bringLayerToFront,
-  sendLayerToBack,
+  bringLayerToBottom,
+  sendLayerToTop,
   historyIndex,
-  selectedLayer,
+  selectedLayers,
   history,
+  canvas,
+  onLayerSelect,
+  onLayerToggleVisibility,
+  onLayerToggleLock,
+  onLayerDuplicate,
+  onLayerDelete,
 }) => {
   return (
-    <Card className="w-100 m-4 mr-2 bg-editor-panel border-editor-panel-border shadow-panel h-auto">
+    <Card className="w-120 m-4 mr-2 bg-editor-panel border-editor-panel-border shadow-panel h-auto min-w-120">
       <div className="p-4 space-y-6 h-auto overflow-y-auto">
         <UpLoadImage handleImageUpload={handleImageUpload} />
 
         <Separator />
 
-        <div className="space-y-4">
-          <ButtonToolbar addTextLayer={addTextLayer} />
+        <ButtonToolbar addTextLayer={addTextLayer} />
 
-          {selectedLayer && (
-            <>
-              <LayerToolBar
-                moveLayerDown={moveLayerDown}
-                moveLayerUp={moveLayerUp}
-                sendLayerToBack={sendLayerToBack}
-                bringLayerToFront={bringLayerToFront}
-              />
+        <Separator />
 
-              {selectedLayer.type === "i-text" && (
-                <TextProperties
-                  selectedLayer={selectedLayer as IText}
-                  updateTextProperty={updateTextProperty}
-                />
-              )}
-            </>
-          )}
-        </div>
+        <LayerList
+          canvas={canvas}
+          selectedLayers={selectedLayers || []}
+          onLayerSelect={onLayerSelect}
+          onLayerToggleVisibility={onLayerToggleVisibility}
+          onLayerToggleLock={onLayerToggleLock}
+          onLayerDuplicate={onLayerDuplicate}
+          onLayerDelete={onLayerDelete}
+          moveLayerDown={moveLayerDown}
+          moveLayerUp={moveLayerUp}
+          sendLayerToTop={sendLayerToTop}
+          bringLayerToBottom={bringLayerToBottom}
+        />
+
+        {selectedLayers && selectedLayers[0]?.type === "i-text" && (
+          <TextProperties
+            selectedLayer={selectedLayers[0] as IText}
+            updateTextProperty={updateTextProperty}
+          />
+        )}
 
         <Separator />
 

@@ -2,18 +2,24 @@
 
 import toast from "react-hot-toast";
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Canvas as FabricCanvas, IText, FabricImage } from "fabric";
+import {
+  Canvas as FabricCanvas,
+  IText,
+  FabricImage,
+  FabricObject,
+} from "fabric";
 import { Toolbar } from "@/components/ImageTextEditor/Toolbar/index";
 import { CanvasArea } from "./canvasArea";
 
 import { useRefState } from "@/hooks/useRefState";
+import { loadSavedState } from "@/utils/loadSavedState";
 
 export const ImageTextEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [historyIndexRef, setHistoryIndex] = useRefState(-1);
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndexRef, setHistoryIndex] = useRefState(0);
 
   const reRender = () => {
     setHistory((prevData) => [...prevData]);
@@ -22,13 +28,11 @@ export const ImageTextEditor: React.FC = () => {
   // Initialize canvas
   useEffect(() => {
     if (!canvasRef.current) return;
-
-    // Load from localStorage on initialization
-    const savedState = localStorage.getItem("imageTextEditor");
+    const savedState = loadSavedState();
 
     const canvas = new FabricCanvas(canvasRef.current, {
-      width: savedState ? JSON.parse(savedState)?.backgroundImage.width : 800,
-      height: savedState ? JSON.parse(savedState)?.backgroundImage.height : 600,
+      width: savedState ? savedState?.backgroundImage?.width : 800,
+      height: savedState ? savedState?.backgroundImage?.height : 600,
       backgroundColor: "#ffffff",
     });
 
@@ -47,32 +51,26 @@ export const ImageTextEditor: React.FC = () => {
     canvas.selection = true;
     canvas.preserveObjectStacking = true;
 
-    canvas.on("selection:updated", () => {
-      reRender();
-    });
-    canvas.on("selection:created", () => {
-      reRender();
-    });
-    canvas.on("selection:cleared", () => {
-      reRender();
-    });
-    canvas.on("text:changed", () => {
-      reRender();
-    });
+    canvas.on("selection:updated", reRender);
+    canvas.on("selection:created", reRender);
+    canvas.on("selection:cleared", reRender);
+    canvas.on("text:changed", reRender);
 
-    canvas.on("object:modified", (e) => {
-      const activeObject = e.target as IText;
-      if (activeObject && activeObject.type === "i-text") {
-        if (activeObject.scaleX && activeObject.scaleX !== 1) {
-          const newFontSize = Math.round(
-            (activeObject.fontSize || 20) * activeObject.scaleX
-          );
-          activeObject.set({
-            fontSize: newFontSize,
-            scaleX: 1,
-            scaleY: 1,
-          });
-        }
+    canvas.on("object:modified", () => {
+      const activeObjects = canvas.getActiveObjects() as IText[];
+      if (activeObjects) {
+        activeObjects.map((activeObject) => {
+          if (activeObject.scaleX && activeObject.scaleX !== 1) {
+            const newFontSize = Math.round(
+              (activeObject.fontSize || 20) * activeObject.scaleX
+            );
+            activeObject.set({
+              fontSize: newFontSize,
+              scaleX: 1,
+              scaleY: 1,
+            });
+          }
+        });
 
         canvas.renderAll();
       }
@@ -86,48 +84,40 @@ export const ImageTextEditor: React.FC = () => {
     };
   }, []);
 
-  // Bring Layer to Front
-  const bringLayerToFront = useCallback(() => {
+  const bringLayerToBottom = useCallback((index: number) => {
     if (!fabricCanvasRef.current) return;
 
-    const activeObject = fabricCanvasRef.current.getActiveObject();
+    const obj = fabricCanvasRef.current.getObjects()[index];
 
-    if (!activeObject) return;
-
-    fabricCanvasRef.current.bringObjectToFront(activeObject);
+    fabricCanvasRef.current!.bringObjectToFront(obj);
+    // fabricCanvasRef.current.renderAll();
+    saveToHistory();
   }, []);
 
-  // Send Layer to Back
-  const sendLayerToBack = useCallback(() => {
+  const sendLayerToTop = useCallback((index: number) => {
     if (!fabricCanvasRef.current) return;
 
-    const activeObject = fabricCanvasRef.current.getActiveObject();
+    const obj = fabricCanvasRef.current.getObjects()[index];
 
-    if (!activeObject) return;
-
-    fabricCanvasRef.current.sendObjectBackwards(activeObject);
+    fabricCanvasRef.current!.sendObjectToBack(obj);
+    saveToHistory();
   }, []);
 
-  // Move Layer Up
-  const moveLayerUp = useCallback(() => {
+  const moveLayerUp = useCallback((index: number) => {
     if (!fabricCanvasRef.current) return;
 
-    const activeObject = fabricCanvasRef.current.getActiveObject();
+    const obj = fabricCanvasRef.current.getObjects()[index];
 
-    if (!activeObject) return;
-
-    fabricCanvasRef.current.bringObjectForward(activeObject);
+    fabricCanvasRef.current!.bringObjectForward(obj);
+    saveToHistory();
   }, []);
 
-  // Move Layer Down
-  const moveLayerDown = useCallback(() => {
+  const moveLayerDown = useCallback((index: number) => {
     if (!fabricCanvasRef.current) return;
+    const obj = fabricCanvasRef.current.getObjects()[index];
 
-    const activeObject = fabricCanvasRef.current.getActiveObject();
-
-    if (!activeObject) return;
-
-    fabricCanvasRef.current.sendObjectToBack(activeObject);
+    fabricCanvasRef.current!.sendObjectBackwards(obj);
+    saveToHistory();
   }, []);
 
   const handleImageUpload = useCallback(
@@ -151,11 +141,20 @@ export const ImageTextEditor: React.FC = () => {
           });
 
           // Set background image
-          FabricImage.fromURL(e.target?.result as string).then((img) => {
-            if (!fabricCanvasRef.current) return;
-            fabricCanvasRef.current.backgroundImage = img;
-            fabricCanvasRef.current.renderAll();
-          });
+          FabricImage.fromURL(e.target?.result as string).then(
+            (img: FabricImage) => {
+              if (!fabricCanvasRef.current) return;
+              img.customId = `background-${Date.now()}`;
+              img.selectable = false;
+              img.evented = false;
+              img.lockScalingX = true;
+              img.lockScalingY = true;
+              img.lockRotation = true;
+              img.lockUniScaling = true;
+              fabricCanvasRef.current.backgroundImage = img;
+              fabricCanvasRef.current.renderAll();
+            }
+          );
 
           setBackgroundImage(e.target?.result as string);
           saveToHistory();
@@ -181,7 +180,7 @@ export const ImageTextEditor: React.FC = () => {
         newHistory.shift();
       }
 
-      setHistoryIndex(newHistory.length - 1);
+      historyIndexRef.current = newHistory.length - 1;
 
       // Save to localStorage
       localStorage.setItem("imageTextEditor", state);
@@ -197,25 +196,32 @@ export const ImageTextEditor: React.FC = () => {
       left: fabricCanvasRef.current.width! / 2,
       top: fabricCanvasRef.current.height! / 2,
       fontSize: 24,
+      fontWeight: 500,
       fill: "#000000",
       textAlign: "center",
       originX: "center",
       originY: "center",
+      lineHeight: 1.16,
+      charSpacing: 0,
     });
 
-    (textObject as any).customId = `text-${Date.now()}`;
+    textObject.customId = `text-${Date.now()}`;
     fabricCanvasRef.current.add(textObject);
     fabricCanvasRef.current.setActiveObject(textObject);
+    fabricCanvasRef.current.requestRenderAll();
     saveToHistory();
+    reRender();
     toast.success("Text layer added!");
-  }, [saveToHistory]);
+  }, [saveToHistory, reRender]);
 
-  const updateTextProperty = useCallback((property: string, value: any) => {
-    const activeObject = fabricCanvasRef.current?.getActiveObject() as IText;
-    if (!activeObject || activeObject.type !== "i-text") return;
+  const updateTextProperty = useCallback((property: string, value: unknown) => {
+    const activeObjects =
+      fabricCanvasRef.current?.getActiveObjects() as IText[];
+    if (!activeObjects || activeObjects[0].type !== "i-text") return;
 
-    activeObject.set(property, value);
-    activeObject.dirty = true;
+    activeObjects.map((activeObjects) => {
+      activeObjects.set(property, value);
+    });
 
     fabricCanvasRef.current?.requestRenderAll();
 
@@ -225,15 +231,16 @@ export const ImageTextEditor: React.FC = () => {
   const undo = useCallback(() => {
     if (historyIndexRef.current <= 0) {
       fabricCanvasRef.current?.clear();
-      return;
     }
 
     const prevState = history[historyIndexRef.current - 1];
-    fabricCanvasRef.current?.loadFromJSON(prevState).then(() => {
-      fabricCanvasRef.current?.renderAll();
-      setHistoryIndex((historyIndex) => historyIndex - 1);
-      reRender();
-    });
+    fabricCanvasRef.current
+      ?.loadFromJSON(prevState ? prevState : {})
+      .then(() => {
+        fabricCanvasRef.current?.renderAll();
+        historyIndexRef.current = historyIndexRef.current - 1;
+        reRender();
+      });
   }, [history]);
 
   const redo = useCallback(() => {
@@ -242,7 +249,7 @@ export const ImageTextEditor: React.FC = () => {
     const nextState = history[historyIndexRef.current + 1];
     fabricCanvasRef.current?.loadFromJSON(nextState).then(() => {
       fabricCanvasRef.current?.renderAll();
-      setHistoryIndex((historyIndex) => historyIndex + 1);
+      historyIndexRef.current = historyIndexRef.current + 1;
       reRender();
     });
   }, [history]);
@@ -282,6 +289,98 @@ export const ImageTextEditor: React.FC = () => {
     toast.success("Editor reset successfully!");
   }, []);
 
+  // Layer management functions
+  const handleLayerSelect = useCallback((layer: FabricObject) => {
+    if (!fabricCanvasRef.current) return;
+    fabricCanvasRef.current.setActiveObject(layer);
+    fabricCanvasRef.current.requestRenderAll();
+    reRender();
+  }, []);
+
+  const handleLayerToggleVisibility = useCallback(
+    (layerId: string) => {
+      if (!fabricCanvasRef.current) return;
+
+      const objects = fabricCanvasRef.current.getObjects();
+      const layer = objects.find((obj) => obj.customId === layerId);
+
+      if (layer) {
+        layer.visible = !layer.visible;
+        fabricCanvasRef.current.requestRenderAll();
+        saveToHistory();
+        reRender();
+      }
+    },
+    [saveToHistory]
+  );
+
+  const handleLayerToggleLock = useCallback(
+    (layerId: string) => {
+      if (!fabricCanvasRef.current) return;
+
+      const objects = fabricCanvasRef.current.getObjects();
+      const layer = objects.find((obj) => obj.customId === layerId);
+
+      if (layer) {
+        layer.selectable = !layer.selectable;
+        layer.evented = !layer.evented;
+        fabricCanvasRef.current.requestRenderAll();
+        saveToHistory();
+        reRender();
+      }
+    },
+    [saveToHistory]
+  );
+
+  const handleLayerDuplicate = useCallback(
+    async (layerId: string) => {
+      if (!fabricCanvasRef.current) return;
+
+      const objects = fabricCanvasRef.current.getObjects();
+      const layer = objects.find((obj) => obj.customId === layerId);
+
+      if (layer) {
+        try {
+          const clonedLayer = await layer.clone();
+          clonedLayer.customId = `layer-${Date.now()}`;
+
+          // Offset the duplicated layer slightly
+          clonedLayer.left = (clonedLayer.left || 0) + 20;
+          clonedLayer.top = (clonedLayer.top || 0) + 20;
+
+          fabricCanvasRef.current.add(clonedLayer);
+          fabricCanvasRef.current.setActiveObject(clonedLayer);
+          fabricCanvasRef.current.requestRenderAll();
+          saveToHistory();
+          reRender();
+          toast.success("Layer duplicated!");
+        } catch (error) {
+          console.error("Error duplicating layer:", error);
+          toast.error("Failed to duplicate layer");
+        }
+      }
+    },
+    [saveToHistory, reRender]
+  );
+
+  const handleLayerDelete = useCallback(
+    (layerId: string) => {
+      if (!fabricCanvasRef.current) return;
+
+      const objects = fabricCanvasRef.current.getObjects();
+      const layer = objects.find((obj) => obj.customId === layerId);
+
+      if (layer) {
+        fabricCanvasRef.current.remove(layer);
+        fabricCanvasRef.current.requestRenderAll();
+        saveToHistory();
+        reRender();
+        toast.success("Layer deleted!");
+      }
+    },
+    [saveToHistory]
+  );
+
   return (
     <div className="h-screen bg-editor-bg flex">
       <Toolbar
@@ -294,11 +393,17 @@ export const ImageTextEditor: React.FC = () => {
         updateTextProperty={updateTextProperty}
         moveLayerUp={moveLayerUp}
         moveLayerDown={moveLayerDown}
-        bringLayerToFront={bringLayerToFront}
-        sendLayerToBack={sendLayerToBack}
+        bringLayerToBottom={bringLayerToBottom}
+        sendLayerToTop={sendLayerToTop}
         historyIndex={historyIndexRef.current}
-        selectedLayer={fabricCanvasRef.current?.getActiveObject()}
+        selectedLayers={fabricCanvasRef.current?.getActiveObjects()}
         history={history}
+        canvas={fabricCanvasRef.current}
+        onLayerSelect={handleLayerSelect}
+        onLayerToggleVisibility={handleLayerToggleVisibility}
+        onLayerToggleLock={handleLayerToggleLock}
+        onLayerDuplicate={handleLayerDuplicate}
+        onLayerDelete={handleLayerDelete}
       />
       <CanvasArea ref={canvasRef} backgroundImage={backgroundImage} />
     </div>

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Download, RotateCcw, Type } from "lucide-react";
 interface ActionToolbarProps {
   undo: () => void;
@@ -6,7 +7,7 @@ interface ActionToolbarProps {
   exportImage: () => void;
   resetEditor: () => void;
   historyIndex: number;
-  history: any[];
+  history: string[];
 }
 export const ActionToolbar = ({
   undo,
@@ -17,7 +18,7 @@ export const ActionToolbar = ({
   history,
 }: ActionToolbarProps) => {
   return (
-    <div className="space-y-4">
+    <Card className="p-4 space-y-4">
       <h2 className="text-lg font-semibold">Actions</h2>
       <div className="flex gap-2">
         <Button
@@ -46,6 +47,6 @@ export const ActionToolbar = ({
           <RotateCcw className="w-4 h-4" />
         </Button>
       </div>
-    </div>
+    </Card>
   );
 };
