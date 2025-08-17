@@ -1,10 +1,9 @@
 "use client";
 
 import React from "react";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Upload, Type } from "lucide-react";
+import { ButtonToolbar } from "@/components/ImageTextEditor/Toolbar/buttonToolbar";
 
 import { FabricObject, IText } from "fabric";
 import { ActionToolbar } from "@/components/ImageTextEditor/Toolbar/actionToolbar";
@@ -46,20 +45,14 @@ export const Toolbar: React.FC<SideLayoutProps> = ({
   history,
 }) => {
   return (
-    <Card className="w-80 m-4 mr-2 bg-editor-panel border-editor-panel-border shadow-panel h-auto">
+    <Card className="w-100 m-4 mr-2 bg-editor-panel border-editor-panel-border shadow-panel h-auto">
       <div className="p-4 space-y-6 h-auto overflow-y-auto">
         <UpLoadImage handleImageUpload={handleImageUpload} />
 
         <Separator />
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Text Tools</h2>
-            <Button onClick={addTextLayer} size="sm">
-              <Type className="w-4 h-4 mr-2" />
-              Add Text
-            </Button>
-          </div>
+          <ButtonToolbar addTextLayer={addTextLayer} />
 
           {selectedLayer && (
             <>

@@ -2,18 +2,10 @@
 
 import toast from "react-hot-toast";
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import {
-  Canvas as FabricCanvas,
-  IText,
-  FabricImage,
-  TPointerEvent,
-  FabricObject,
-} from "fabric";
+import { Canvas as FabricCanvas, IText, FabricImage } from "fabric";
 import { Toolbar } from "@/components/ImageTextEditor/Toolbar/index";
 import { CanvasArea } from "./canvasArea";
 
-import { TextLayer } from "@/type/type";
-import axios from "axios";
 import { useRefState } from "@/hooks/useRefState";
 
 export const ImageTextEditor: React.FC = () => {
@@ -31,11 +23,25 @@ export const ImageTextEditor: React.FC = () => {
   useEffect(() => {
     if (!canvasRef.current) return;
 
+    // Load from localStorage on initialization
+    const savedState = localStorage.getItem("imageTextEditor");
+
     const canvas = new FabricCanvas(canvasRef.current, {
-      width: 800,
-      height: 600,
+      width: savedState ? JSON.parse(savedState)?.backgroundImage.width : 800,
+      height: savedState ? JSON.parse(savedState)?.backgroundImage.height : 600,
       backgroundColor: "#ffffff",
     });
+
+    if (savedState) {
+      canvas.loadFromJSON(savedState).then(() => {
+        canvas.renderAll();
+        setBackgroundImage("restored");
+        saveToHistory();
+        toast.success("Canvas restored from previous session!");
+      });
+    } else {
+      toast.success("Canvas initialized! Upload an image to get started.");
+    }
 
     // Enable object controls
     canvas.selection = true;
@@ -67,15 +73,13 @@ export const ImageTextEditor: React.FC = () => {
             scaleY: 1,
           });
         }
-        console.log("Object modified", canvas.getActiveObject());
+
         canvas.renderAll();
       }
       saveToHistory();
     });
 
     fabricCanvasRef.current = canvas;
-
-    toast.success("Canvas initialized! Upload an image to get started.");
 
     return () => {
       canvas.dispose();
@@ -176,9 +180,12 @@ export const ImageTextEditor: React.FC = () => {
       if (newHistory.length > 20) {
         newHistory.shift();
       }
-      console.log("newHistory:length", newHistory.length);
-      console.log("newHistory", newHistory);
+
       setHistoryIndex(newHistory.length - 1);
+
+      // Save to localStorage
+      localStorage.setItem("imageTextEditor", state);
+
       return newHistory;
     });
   }, [history]);

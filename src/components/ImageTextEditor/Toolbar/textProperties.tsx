@@ -1,6 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FontPicker } from "@/components/ui/font-picker";
+import { useDebouncedCallback } from "use-debounce";
+import { useCallback } from "react";
 
 import { FONT_WEIGHTS } from "@/constants/constants";
 import {
@@ -21,6 +23,18 @@ export const TextProperties = ({
   selectedLayer,
   updateTextProperty,
 }: TextPropertiesProps) => {
+  const DebounceUpdateTextColor = useDebouncedCallback(
+    (property: string, value: any) => updateTextProperty(property, value),
+    300
+  );
+
+  const updateTextColor = useCallback(
+    (property: string, value: string) => {
+      DebounceUpdateTextColor(property, value);
+    },
+    [DebounceUpdateTextColor]
+  );
+
   return (
     <div className="space-y-4">
       <div>
@@ -78,7 +92,7 @@ export const TextProperties = ({
         <Input
           type="color"
           value={String(selectedLayer.fill)}
-          onChange={(e) => updateTextProperty("fill", e.target.value)}
+          onChange={(e) => updateTextColor("fill", e.target.value)}
           className="h-10 mt-1"
         />
       </div>
